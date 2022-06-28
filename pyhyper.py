@@ -13,8 +13,7 @@ print(f'{PyHyperScattering.__version__}')
 
 RUN_TO_PLOT = 36106
 
-# This will need to be changed. This was for the User's Meeting demo.
-PATH = f"/nsls2/data/tst/proposals/2022-2/prefect-test/"
+PATH = "/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/"
 
 @task
 def write_run_artifacts(RUN_TO_PLOT):
