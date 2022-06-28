@@ -15,7 +15,7 @@ with Flow("end-of-run-workflow") as flow:
     validation_flow = create_flow_run(
         flow_name="general-data-validation",
         project_name="RSoXS",
-        parameters={"beamline_acronym": "sst" ,"uid": uid}
+        parameters={"beamline_acronym": "rsoxs" ,"uid": uid}
     )
     log_completion(upstream_tasks=[validation_flow])
 
