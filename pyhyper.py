@@ -25,11 +25,13 @@ def write_run_artifacts(RUN_TO_PLOT):
     '''
     # Prefect logger
     logger = prefect.context.get("logger")
+    logger.info("Starting...")
 
-    c = from_profile('nsls2')
-    rsoxsload = PyHyperScattering.load.SST1RSoXSDB(corr_mode='none', catalog=c["rsoxs"])
-    itp = rsoxsload.loadRun(c["rsoxs"][RUN_TO_PLOT],dims=['energy'])
+    c = from_profile("nsls2", username=None)
+    rsoxsload = PyHyperScattering.load.SST1RSoXSDB(corr_mode='none', catalog=c["rsoxs"]["raw"])
+    itp = rsoxsload.loadRun(c["rsoxs"]["raw"][RUN_TO_PLOT],dims=['energy'])
 
+    logger.info("Getting mask")
     if itp.rsoxs_config == 'waxs':
         maskmethod = 'nika'
         mask = '/nsls2/data/sst/legacy/RSoXS/analysis/SST1_WAXS_mask.hdf'
@@ -40,14 +42,16 @@ def write_run_artifacts(RUN_TO_PLOT):
         maskmethod = 'none'
         warnings.warn(f'Bad rsoxs_config, expected saxs or waxs but found {itp.rsoxs_config}.  This will disable masking and certainly cause issues later.',stacklevel=2)
 
-
+    logger.info("PFEnergySeriesIntegrator")
     integ = PyHyperScattering.integrate.PFEnergySeriesIntegrator(maskmethod=maskmethod,maskpath=mask,geomethod='template_xr',template_xr=itp,integration_method='csr_ocl')
 
     name = itp.attrs["sample_name"]
 
     # DataArray
+    logger.info("integrateImageStack")
     integratedimages = integ.integrateImageStack(itp)
 
+    logger.info("Saving Nexus file")
     try:
         integratedimages.fileio.saveNexus(f'{PATH}reduced_{RUN_TO_PLOT}_{name}.nxs')
     except Exception:
