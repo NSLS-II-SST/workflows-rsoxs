@@ -19,7 +19,7 @@ def test_task():
     print("Test task")
 
 
-#@task
+@task
 def export_task(uid):
 
     """
@@ -56,10 +56,10 @@ def export_task(uid):
 
 # Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
-#with Flow("export") as flow:
-#    uid = Parameter("uid")
-#    test_task()
-#    export_task(uid)
+with Flow("export") as flow:
+    uid = Parameter("uid")
+    test_task()
+    export_task(uid)
 
 
 def safe_subtract(light, dark):
