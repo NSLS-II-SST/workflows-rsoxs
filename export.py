@@ -3,27 +3,26 @@ import databroker
 
 from pathlib import Path
 from tiled.client import from_profile
+from tiled.queries import Eq
 from prefect import task, Flow, Parameter
 from bluesky_darkframes import DarkSubtraction
 
-rsoxs = from_profile("nsls2", username=None)["rsoxs"]
-raw = rsoxs["raw"]
-processed = rsoxs["sandbox"]
 
+tiled_client = from_profile("nsls2", username=None)["rsoxs"]
+tiled_client_raw = tiled_client["raw"]
+tiled_client_processed = tiled_client["sandbox"]
 
-PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
-
-
-@task
-def test_task():
-    print("Test task")
+EXPORT_PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
 
 
 @task
-def export_task(uid):
+def write_dark_subtraction(uid):
 
     """
     This is a Prefect task that perform dark subtraction.
+    
+    Subtract dark frame images from the data,
+    and write the result to tiled.
 
     This task is typically triggered manually from the Prefect webapp, but eventually
     it can be triggered by the end_of_run workflow.
@@ -34,70 +33,120 @@ def export_task(uid):
         This is the uid which will be exported.
     """
 
-    fields = [
+    # Defining some variable that we will use later in this function.
+    uid = tiled_client_raw[uid].start["uid"]
+    run = tiled_client[uid]
+    primary_data = run["primary"]["data"]
+    dark_data = run["dark"]["data"]
+
+    # The set of fields that should be exported if found in the scan.
+    export_fields = {
         "Synced_saxs_image",
         "Synced_waxs_image",
         "Small Angle CCD Detector_image",
         "Wide Angle CCD Detector_image",
-    ]
+    }
 
-    uid = raw[uid].start['uid']
-    primary_data = raw[uid]["primary"]["data"]
-    dark_data = raw[uid]["dark"]["data"]
-    for field in fields:
-        if field in primary_data:
-            light = primary_data[field][:]
-            dark = dark_data[field][:]
-            subtracted = safe_subtract(light, dark.reindex_like(light, "ffill"))
-            processed_uid = processed.write_array(subtracted.data.compute(), metadata={"field": field, "python_environment": sys.prefix, "raw_uid": uid})
-            for i in range(subtracted.shape[0]):
-                processed[processed_uid].export(PATH / f"{uid}-{field}_{i:06}.tif", slice=(i,0))
+    # The set of fields for the primary data set.
+    primary_fields = set(run["primary"]["data"])
 
+    # The export_fields that are found in the primary dataset.
+    found_fields = export_fields & primary_fields
 
-# Make the Prefect Flow.
-# A separate command is needed to register it with the Prefect server.
-with Flow("export") as flow:
-    uid = Parameter("uid")
-    test_task()
-    export_task(uid)
+    # Write the dark substracted images to tiled.
+    for field in found_fields:
+        light = primary_data[field][:]
+        dark = dark_data[field][:]
+        subtracted = light - dark.reindex_like(light, "ffill")
+        processed_uid = tiled_client_processed.write_array(
+            subtracted.data.compute(),
+            metadata={"field": field, "python_environment": sys.prefix, "raw_uid": uid},
+        )
 
 
-def safe_subtract(light, dark):
-    return light - dark
-
-
-def dark_subtraction(run):
-
-    """
-    Subtract dark frame images from the data.
-
-    Parameters
-    ----------
-    run: BlueskyRun
-
-    """
-
-
-def tiff_export(run):
+@task
+def tiff_export(uid):
 
     """
     Export processed data into a tiff file.
 
     Parameters
     ----------
-    run: BlueskyRun
+    uid: string
+        BlueskyRun uid
+
+    """
+
+    # Find all of the processed data for a BlueskyRun.
+    processed_results = tiled_client_processed.search(Eq('raw_uid', uid))
+
+    # Export a tiff for each of the processed datasets
+    for dataset in processed_results:
+        num_frames = len(dataset)
+        for i in range(num_frames):
+            dataset.export(
+            EXPORT_PATH / f"{uid}-{dataset.metadata['field']}_{i:06}.tif", slice=(i, 0)
+        )
+
+
+@task
+def csv_export(uid):
+
+    """
+    Export processed data into a tiff file.
+
+    Parameters
+    ----------
+    uid: string
+        BlueskyRun uid
+
+    """
+    # Find all of the processed data for a BlueskyRun.
+    processed_results = tiled_client_processed.search(Eq('raw_uid', uid))
+
+    # Export a tiff for each of the processed datasets
+    for dataset in processed_results:
+        num_frames = len(dataset)
+        for i in range(num_frames):
+            dataset.export(
+            EXPORT_PATH / f"{uid}-{dataset.metadata['field']}_{i:06}.csv", slice=(i, 0)
+        )
+
+
+@task
+def json_export(uid):
+
+    """
+    Export processed data into a tiff file.
+
+    Parameters
+    ----------
+    uid: string
+        BlueskyRun uid
 
     """
 
 
-def validate(run):
+#Make the Prefect Flow.
+# A separate command is needed to register it with the Prefect server.
+with Flow("export") as flow:
+    uid = Parameter("uid")
+    write_dark_subtraction(uid)
+    tiff_export(uid)
+    csv_export(uid)
+    json_export(uid)
+
+
+@task
+def validate(uid):
 
     """
     Validate tiff fikes.
 
     Parameters
     ----------
-    run: BlueskyRun
+    uid: string
+        BlueskyRun uid
 
     """
 
