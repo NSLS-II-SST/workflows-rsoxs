@@ -1,5 +1,6 @@
 import sys
 import databroker
+import json
 
 from pathlib import Path
 from tiled.client import from_profile
@@ -130,6 +131,10 @@ def json_export(uid):
         BlueskyRun uid
 
     """
+    uid = tiled_client_raw[uid].start["uid"]
+    start_doc = tiled_client_raw[uid].start   
+    with open(EXPORT_PATH / f'{uid}.json', 'w', encoding='utf-8') as f:
+        json.dump(start_doc, f, ensure_ascii=False, indent=4)
 
 
 #Make the Prefect Flow.
