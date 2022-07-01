@@ -15,12 +15,12 @@ tiled_client_processed = tiled_client["sandbox"]
 EXPORT_PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
 
 
-@task
+#@task
 def write_dark_subtraction(uid):
 
     """
     This is a Prefect task that perform dark subtraction.
-    
+
     Subtract dark frame images from the data,
     and write the result to tiled.
 
@@ -35,7 +35,7 @@ def write_dark_subtraction(uid):
 
     # Defining some variable that we will use later in this function.
     uid = tiled_client_raw[uid].start["uid"]
-    run = tiled_client[uid]
+    run = tiled_client_raw[uid]
     primary_data = run["primary"]["data"]
     dark_data = run["dark"]["data"]
 
@@ -64,7 +64,7 @@ def write_dark_subtraction(uid):
         )
 
 
-@task
+#@task
 def tiff_export(uid):
 
     """
@@ -77,19 +77,21 @@ def tiff_export(uid):
 
     """
 
+    uid = tiled_client_raw[uid].start["uid"]
+
     # Find all of the processed data for a BlueskyRun.
     processed_results = tiled_client_processed.search(Eq('raw_uid', uid))
 
     # Export a tiff for each of the processed datasets
-    for dataset in processed_results:
-        num_frames = len(dataset)
-        for i in range(num_frames):
-            dataset.export(
-            EXPORT_PATH / f"{uid}-{dataset.metadata['field']}_{i:06}.tif", slice=(i, 0)
-        )
+    dataset = processed_results.values().last()
+    num_frames = len(dataset)
+    for i in range(num_frames):
+        processed_results[dataset].export(
+        EXPORT_PATH / f"{uid}-{processed_results[dataset].metadata['field']}_{i:06}.tif", slice=(i, 0)
+    )
 
 
-@task
+#@task
 def csv_export(uid):
 
     """
@@ -101,19 +103,22 @@ def csv_export(uid):
         BlueskyRun uid
 
     """
+
+    uid = tiled_client_raw[uid].start["uid"]
+    
     # Find all of the processed data for a BlueskyRun.
     processed_results = tiled_client_processed.search(Eq('raw_uid', uid))
 
     # Export a tiff for each of the processed datasets
-    for dataset in processed_results:
-        num_frames = len(dataset)
-        for i in range(num_frames):
-            dataset.export(
-            EXPORT_PATH / f"{uid}-{dataset.metadata['field']}_{i:06}.csv", slice=(i, 0)
-        )
+    dataset = processed_results.values().last()
+    num_frames = len(dataset)
+    for i in range(num_frames):
+        dataset.export(
+        EXPORT_PATH / f"{uid}-{dataset.metadata['field']}_{i:06}.csv", slice=(i, 0)
+    )
 
 
-@task
+#@task
 def json_export(uid):
 
     """
@@ -129,15 +134,15 @@ def json_export(uid):
 
 #Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
-with Flow("export") as flow:
-    uid = Parameter("uid")
-    write_dark_subtraction(uid)
-    tiff_export(uid)
-    csv_export(uid)
-    json_export(uid)
+#with Flow("export") as flow:
+#    uid = Parameter("uid")
+#    write_dark_subtraction(uid)
+#    tiff_export(uid)
+#    csv_export(uid)
+#    json_export(uid)
 
 
-@task
+#@task
 def validate(uid):
 
     """
