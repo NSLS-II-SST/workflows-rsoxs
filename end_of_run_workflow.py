@@ -17,13 +17,11 @@ with Flow("end-of-run-workflow") as flow:
     validation_flow = create_flow_run(
         flow_name="general-data-validation",
         project_name="RSoXS",
-        parameters={"beamline_acronym": "rsoxs" ,"uid": uid}
+        parameters={"beamline_acronym": "rsoxs", "uid": uid},
     )
 
     export_flow = create_flow_run(
-        flow_name="export",
-        project_name="RSoXS",
-        parameters={"uid": uid}
+        flow_name="export", project_name="RSoXS", parameters={"uid": uid}
     )
 
     log_completion(upstream_tasks=[validation_flow, export_flow])
