@@ -122,7 +122,11 @@ def tiff_export(uid, processed_uids):
 def csv_export(uid):
 
     """
-    Export processed data into a csv file.
+    Export each stream as a CSV file.
+
+    - Include only scalar fields (e.g. no images).
+    - Put the primary stream at top level with the scan directory
+      and put  all other streams in a subdirectory, per Eliot's convention.
 
     Parameters
     ----------
@@ -130,18 +134,38 @@ def csv_export(uid):
         BlueskyRun uid
 
     """
+    run = tiled_client_raw[uid]
+    start = run.start
 
-    uid = tiled_client_raw[uid].start["uid"]
-
-    # Find all of the processed data for a BlueskyRun.
-    processed_results = tiled_client_processed.search(Eq("raw_uid", uid))
-
-    # Export a csv for each of the processed datasets
-    dataset = processed_results.values().last()
-    num_frames = len(dataset)
-    for i in range(num_frames):
+    base_directory = EXPORT_PATH / "auto" / start["project_name"]
+    base_directory.mkdir(parents=True, exist_ok=True)
+    for stream_name, stream in run.items():
+        if stream_name != "primary":
+            directory = base_directory / f"{start['scan_id']}"
+            directory.mkdir(parents=True, exist_ok=True)
+        else:
+            directory = base_directory
+        # TODO Soon Tiled will support
+        # >>> stream["data"].search(ArrayNdim(1))
+        # to filter it down to only scalar fields.
+        # For now we need to filter on the client side.
+        scalar_fields  = []
+        dataset = stream["data"]
+        structure = dataset.structure()
+        for field in dataset:
+            # WARNING: Future Tiled release is highly likely to break this API
+            # (but also provide the nicer way to do this described above).
+            shape = structure.macro.data_vars[field].macro.variable.macro.shape
+            ndim = len(shape)
+            if ndim == 1:
+                scalar_fields.append(field)
+        # WARNING: variables= might get renamed to fields= in future Tiled.
+        # FIXME: Trying to get all the scalar_fields fails; we are limiting
+        # this to the first 20 to get this to run.
         dataset.export(
-            EXPORT_PATH / f"{uid}-{dataset.metadata['field']}_{i:06}.csv", slice=(i, 0)
+            directory
+            / f"{start['scan_id']}-{start['sample_name']}-{stream_name}.csv",
+            variables=scalar_fields[:20]
         )
 
 
@@ -157,9 +181,12 @@ def json_export(uid):
         BlueskyRun uid
 
     """
-    start_doc = tiled_client_raw[uid].start
-    with open(EXPORT_PATH / f"{uid}.json", "w", encoding="utf-8") as f:
-        json.dump(start_doc, f, ensure_ascii=False, indent=4)
+    start = tiled_client_raw[uid].start
+    directory = EXPORT_PATH / "auto" / start["project_name"] / f"{start['scan_id']}"
+    directory.mkdir(parents=True, exist_ok=True)
+
+    with open(directory / f"{start['scan_id']}-{start['sample_name']}.json", "w", encoding="utf-8") as file:
+        json.dump(start, file, ensure_ascii=False, indent=4)
 
 
 # Make the Prefect Flow.
