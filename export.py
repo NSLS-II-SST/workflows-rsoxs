@@ -34,7 +34,6 @@ def write_dark_subtraction(uid):
     """
 
     # Defining some variable that we will use later in this function.
-    uid = tiled_client_raw[uid].start["uid"]
     run = tiled_client_raw[uid]
     primary_data = run["primary"]["data"]
     dark_data = run["dark"]["data"]
@@ -100,8 +99,9 @@ def tiff_export(uid, processed_uids):
 
     """
     start = tiled_client_raw[uid].start
-    uid = start["uid"]
     # This is the result of combining 2 streams so we'll set the stream name as primary
+    # Maybe we shouldn't use a stream name in the filename at all,
+    # but for now we are maintaining backward-compatibility with existing names.
     STREAM_NAME = "primary"
 
     directory = EXPORT_PATH / "auto" / start["project_name"] / f"{start['scan_id']}"
@@ -157,7 +157,6 @@ def json_export(uid):
         BlueskyRun uid
 
     """
-    uid = tiled_client_raw[uid].start["uid"]
     start_doc = tiled_client_raw[uid].start
     with open(EXPORT_PATH / f"{uid}.json", "w", encoding="utf-8") as f:
         json.dump(start_doc, f, ensure_ascii=False, indent=4)
