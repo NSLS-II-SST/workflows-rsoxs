@@ -1,14 +1,11 @@
 import sys
-import databroker
 import json
 import numpy
-import prefect
 
 from pathlib import Path
 from tiled.client import from_profile
 from tiled.queries import Eq
 from prefect import task, Flow, Parameter
-from bluesky_darkframes import DarkSubtraction
 
 
 tiled_client = from_profile("nsls2", username=None)["rsoxs"]
@@ -66,7 +63,12 @@ def write_dark_subtraction(uid):
         subtracted = safe_subtract(light, dark)
         processed_uid = tiled_client_processed.write_array(
             subtracted.data,
-            metadata={"field": field, "python_environment": sys.prefix, "raw_uid": uid, "operation": "dark subtraction"},
+            metadata={
+                "field": field,
+                "python_environment": sys.prefix,
+                "raw_uid": uid,
+                "operation": "dark subtraction",
+            },
         )
         processed_uid_dict[field] = processed_uid
     return processed_uid_dict
@@ -80,7 +82,10 @@ def safe_subtract(light, dark, pedestal=100):
 
     dark = numpy.clip(dark, a_min=0, a_max=None)
 
-    return numpy.clip(light - dark.reindex_like(light, "ffill"), a_min=0, a_max=None).astype(light.dtype)
+    return numpy.clip(
+        light - dark.reindex_like(light, "ffill"), a_min=0, a_max=None
+    ).astype(light.dtype)
+
 
 @task
 def tiff_export(uid, processed_uids):
@@ -99,10 +104,7 @@ def tiff_export(uid, processed_uids):
     # This is the result of combining 2 streams so we'll set the stream name as primary
     STREAM_NAME = "primary"
 
-    directory = (EXPORT_PATH /
-                "auto" /
-                start["project_name"] /
-                f"{start['scan_id']}")
+    directory = EXPORT_PATH / "auto" / start["project_name"] / f"{start['scan_id']}"
     directory.mkdir(parents=True, exist_ok=True)
     for field, processed_uid in processed_uids.items():
         dataset = tiled_client_processed[processed_uid]
@@ -110,9 +112,10 @@ def tiff_export(uid, processed_uids):
         num_frames = len(dataset)
         for i in range(num_frames):
             dataset.export(
-                directory /
-                f"{start['scan_id']}-{start['sample_name']}-{STREAM_NAME}-{field}-{i:05d}.tif", slice=(i, 0)
-        )
+                directory
+                / f"{start['scan_id']}-{start['sample_name']}-{STREAM_NAME}-{field}-{i:05d}.tif",
+                slice=(i, 0),
+            )
 
 
 @task
@@ -131,15 +134,15 @@ def csv_export(uid):
     uid = tiled_client_raw[uid].start["uid"]
 
     # Find all of the processed data for a BlueskyRun.
-    processed_results = tiled_client_processed.search(Eq('raw_uid', uid))
+    processed_results = tiled_client_processed.search(Eq("raw_uid", uid))
 
     # Export a csv for each of the processed datasets
     dataset = processed_results.values().last()
     num_frames = len(dataset)
     for i in range(num_frames):
         dataset.export(
-        EXPORT_PATH / f"{uid}-{dataset.metadata['field']}_{i:06}.csv", slice=(i, 0)
-    )
+            EXPORT_PATH / f"{uid}-{dataset.metadata['field']}_{i:06}.csv", slice=(i, 0)
+        )
 
 
 @task
@@ -156,53 +159,16 @@ def json_export(uid):
     """
     uid = tiled_client_raw[uid].start["uid"]
     start_doc = tiled_client_raw[uid].start
-    with open(EXPORT_PATH / f'{uid}.json', 'w', encoding='utf-8') as f:
+    with open(EXPORT_PATH / f"{uid}.json", "w", encoding="utf-8") as f:
         json.dump(start_doc, f, ensure_ascii=False, indent=4)
 
 
 # Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
 with Flow("export") as flow:
-   uid = Parameter("uid")
-   processed_uids = write_dark_subtraction(uid)
-   tiff_export(uid, processed_uids)
-   csv_export(uid)
-   json_export(uid)
+    uid = Parameter("uid")
+    processed_uids = write_dark_subtraction(uid)
+    tiff_export(uid, processed_uids)
+    csv_export(uid)
+    json_export(uid)
 
-
-#@task
-# def validate(uid):
-
-#     """
-#     Validate tiff fikes.
-
-#     Parameters
-#     ----------
-#     uid: string
-#         BlueskyRun uid
-
-#     """
-
-
-#    logger = prefect.context.get("logger")
-#
-#    # Connect to the tiled server, and get the set of runs from the set of uids.
-#    tiled_client = databroker.from_profile("nsls2", username=None)["rsoxs"]["raw"]
-#    run = tiled_client[uid]
-#
-#    # Add task #1 below.
-#    logger.info(f"Dark subtraction: {uid}")
-#    dark_subtraction(run)
-#    logger.info("Dark subtraction is completed")
-#
-#    # Add task #2 below etc.
-#    logger.info(f"Dark subtraction: {uid}")
-#    tiff_export(run)
-#    logger.info("Tiff export is completed")
-#
-#    # Add validation task below
-#    logger.info(f"Validating ....")
-#    validate(run)
-#    logger.info("Validation complete.")
-#
-#    logger.info("#### Add custom message here ####")
