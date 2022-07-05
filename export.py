@@ -1,6 +1,7 @@
 import sys
 import databroker
 import json
+import numpy
 
 from pathlib import Path
 from tiled.client import from_profile
@@ -16,7 +17,7 @@ tiled_client_processed = tiled_client["sandbox"]
 EXPORT_PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
 
 
-#@task
+@task
 def write_dark_subtraction(uid):
 
     """
@@ -58,14 +59,24 @@ def write_dark_subtraction(uid):
     for field in found_fields:
         light = primary_data[field][:]
         dark = dark_data[field][:]
-        subtracted = light - dark.reindex_like(light, "ffill")
+        subtracted = safe_subtract(light, dark)
         processed_uid = tiled_client_processed.write_array(
-            subtracted.data.compute(),
-            metadata={"field": field, "python_environment": sys.prefix, "raw_uid": uid},
+            subtracted.data,
+            metadata={"field": field, "python_environment": sys.prefix, "raw_uid": uid, "operation": "dark subtraction"},
         )
 
 
-#@task
+def safe_subtract(light, dark, pedestal=100):
+    dark.load()
+    light.load()
+
+    dark = dark - pedestal
+
+    dark = numpy.clip(dark, a_min=0, a_max=None)
+
+    return numpy.clip(light - dark.reindex_like(light, "ffill"), a_min=0, a_max=None).astype(light.dtype)
+
+@task
 def tiff_export(uid):
 
     """
@@ -79,6 +90,9 @@ def tiff_export(uid):
     """
 
     uid = tiled_client_raw[uid].start["uid"]
+    start = tiled_client_raw[uid].start
+    # This is the result of combining 2 streams so we'll set the stream name as primary
+    STREAM_NAME = "primary"
 
     # Find all of the processed data for a BlueskyRun.
     processed_results = tiled_client_processed.search(Eq('raw_uid', uid))
@@ -86,17 +100,23 @@ def tiff_export(uid):
     # Export a tiff for each of the processed datasets
     dataset = processed_results.values().last()
     num_frames = len(dataset)
+    directory = (EXPORT_PATH /
+                "auto" /
+                start["project_name"] /
+                f"{start['scan_id']}")
+    directory.mkdir(parents=True, exist_ok=True)
     for i in range(num_frames):
-        processed_results[dataset].export(
-        EXPORT_PATH / f"{uid}-{processed_results[dataset].metadata['field']}_{i:06}.tif", slice=(i, 0)
+        dataset.export(
+            directory /
+            f"{start['scan_id']}-{start['sample_name']}-{STREAM_NAME}-{dataset.metadata['field']}-{i:05d}.tif", slice=(i, 0)
     )
 
 
-#@task
+@task
 def csv_export(uid):
 
     """
-    Export processed data into a tiff file.
+    Export processed data into a csv file.
 
     Parameters
     ----------
@@ -106,11 +126,11 @@ def csv_export(uid):
     """
 
     uid = tiled_client_raw[uid].start["uid"]
-    
+
     # Find all of the processed data for a BlueskyRun.
     processed_results = tiled_client_processed.search(Eq('raw_uid', uid))
 
-    # Export a tiff for each of the processed datasets
+    # Export a csv for each of the processed datasets
     dataset = processed_results.values().last()
     num_frames = len(dataset)
     for i in range(num_frames):
@@ -119,11 +139,11 @@ def csv_export(uid):
     )
 
 
-#@task
+@task
 def json_export(uid):
 
     """
-    Export processed data into a tiff file.
+    Export start document into a json file.
 
     Parameters
     ----------
@@ -132,33 +152,33 @@ def json_export(uid):
 
     """
     uid = tiled_client_raw[uid].start["uid"]
-    start_doc = tiled_client_raw[uid].start   
+    start_doc = tiled_client_raw[uid].start
     with open(EXPORT_PATH / f'{uid}.json', 'w', encoding='utf-8') as f:
         json.dump(start_doc, f, ensure_ascii=False, indent=4)
 
 
-#Make the Prefect Flow.
+# Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
-#with Flow("export") as flow:
-#    uid = Parameter("uid")
-#    write_dark_subtraction(uid)
-#    tiff_export(uid)
-#    csv_export(uid)
-#    json_export(uid)
+with Flow("export") as flow:
+   uid = Parameter("uid")
+   dark_subtract = write_dark_subtraction(uid)
+   tiff_export(uid, upstream_tasks=[dark_subtract])
+   csv_export(uid)
+   json_export(uid)
 
 
 #@task
-def validate(uid):
+# def validate(uid):
 
-    """
-    Validate tiff fikes.
+#     """
+#     Validate tiff fikes.
 
-    Parameters
-    ----------
-    uid: string
-        BlueskyRun uid
+#     Parameters
+#     ----------
+#     uid: string
+#         BlueskyRun uid
 
-    """
+#     """
 
 
 #    logger = prefect.context.get("logger")
