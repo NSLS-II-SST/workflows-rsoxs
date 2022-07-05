@@ -2,6 +2,7 @@ import sys
 import databroker
 import json
 import numpy
+import prefect
 
 from pathlib import Path
 from tiled.client import from_profile
@@ -55,6 +56,9 @@ def write_dark_subtraction(uid):
     # The export_fields that are found in the primary dataset.
     found_fields = export_fields & primary_fields
 
+    # Map field to processed uid to use in other tasks
+    processed_uid_dict = {}
+
     # Write the dark substracted images to tiled.
     for field in found_fields:
         light = primary_data[field][:]
@@ -64,6 +68,8 @@ def write_dark_subtraction(uid):
             subtracted.data,
             metadata={"field": field, "python_environment": sys.prefix, "raw_uid": uid, "operation": "dark subtraction"},
         )
+        processed_uid_dict[field] = processed_uid
+    return processed_uid_dict
 
 
 def safe_subtract(light, dark, pedestal=100):
@@ -77,7 +83,7 @@ def safe_subtract(light, dark, pedestal=100):
     return numpy.clip(light - dark.reindex_like(light, "ffill"), a_min=0, a_max=None).astype(light.dtype)
 
 @task
-def tiff_export(uid):
+def tiff_export(uid, processed_uids):
 
     """
     Export processed data into a tiff file.
@@ -88,28 +94,25 @@ def tiff_export(uid):
         BlueskyRun uid
 
     """
-
-    uid = tiled_client_raw[uid].start["uid"]
     start = tiled_client_raw[uid].start
+    uid = start["uid"]
     # This is the result of combining 2 streams so we'll set the stream name as primary
     STREAM_NAME = "primary"
 
-    # Find all of the processed data for a BlueskyRun.
-    processed_results = tiled_client_processed.search(Eq('raw_uid', uid))
-
-    # Export a tiff for each of the processed datasets
-    dataset = processed_results.values().last()
-    num_frames = len(dataset)
     directory = (EXPORT_PATH /
                 "auto" /
                 start["project_name"] /
                 f"{start['scan_id']}")
     directory.mkdir(parents=True, exist_ok=True)
-    for i in range(num_frames):
-        dataset.export(
-            directory /
-            f"{start['scan_id']}-{start['sample_name']}-{STREAM_NAME}-{dataset.metadata['field']}-{i:05d}.tif", slice=(i, 0)
-    )
+    for field, processed_uid in processed_uids.items():
+        dataset = tiled_client_processed[processed_uid]
+        assert field == dataset.metadata["field"]
+        num_frames = len(dataset)
+        for i in range(num_frames):
+            dataset.export(
+                directory /
+                f"{start['scan_id']}-{start['sample_name']}-{STREAM_NAME}-{field}-{i:05d}.tif", slice=(i, 0)
+        )
 
 
 @task
@@ -161,8 +164,8 @@ def json_export(uid):
 # A separate command is needed to register it with the Prefect server.
 with Flow("export") as flow:
    uid = Parameter("uid")
-   dark_subtract = write_dark_subtraction(uid)
-   tiff_export(uid, upstream_tasks=[dark_subtract])
+   processed_uids = write_dark_subtraction(uid)
+   tiff_export(uid, processed_uids)
    csv_export(uid)
    json_export(uid)
 
