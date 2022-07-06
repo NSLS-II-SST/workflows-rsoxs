@@ -21,7 +21,7 @@ with Flow("end-of-run-workflow") as flow:
     )
 
     export_flow = create_flow_run(
-        flow_name="export", project_name="RSoXS", parameters={"uid": uid}
+        flow_name="export", project_name="RSoXS", parameters={"ref": uid}
     )
 
     log_completion(upstream_tasks=[validation_flow, export_flow])

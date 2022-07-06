@@ -16,7 +16,7 @@ EXPORT_PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
 
 
 @task
-def write_dark_subtraction(uid):
+def write_dark_subtraction(ref):
 
     """
     This is a Prefect task that perform dark subtraction.
@@ -29,12 +29,17 @@ def write_dark_subtraction(uid):
 
     Parameters
     ----------
-    uid: string
-        This is the uid which will be exported.
+    ref: string
+        This is the reference to the BlueskyRun to be exported. It can be
+        a partial uid, a full uid, a scan_id, or an index (e.g. -1).
     """
 
     # Defining some variable that we will use later in this function.
-    run = tiled_client_raw[uid]
+    run = tiled_client_raw[ref]
+    # Note: We need to grab the full uid so we can pair the subtracted
+    # data and the raw data together when we write the subtracted data
+    # into Tiled.
+    full_uid = run.start["uid"]
     primary_data = run["primary"]["data"]
     dark_data = run["dark"]["data"]
 
@@ -52,7 +57,7 @@ def write_dark_subtraction(uid):
     # The export_fields that are found in the primary dataset.
     found_fields = export_fields & primary_fields
 
-    # Map field to processed uid to use in other tasks
+    # Map field to processed uid to use in other tasks.
     processed_uid_dict = {}
 
     # Write the dark substracted images to tiled.
@@ -65,7 +70,7 @@ def write_dark_subtraction(uid):
             metadata={
                 "field": field,
                 "python_environment": sys.prefix,
-                "raw_uid": uid,
+                "raw_uid": full_uid,
                 "operation": "dark subtraction",
             },
         )
@@ -87,18 +92,19 @@ def safe_subtract(light, dark, pedestal=100):
 
 
 @task
-def tiff_export(uid, processed_uids):
+def tiff_export(ref, processed_uids):
 
     """
     Export processed data into a tiff file.
 
     Parameters
     ----------
-    uid: string
-        BlueskyRun uid
+    ref: string
+        Reference to a BlueskyRun. Can be a full uid, a partial uid,
+        a scan id, or an index (e.g. -1).
 
     """
-    start = tiled_client_raw[uid].start
+    start = tiled_client_raw[ref].start
     # This is the result of combining 2 streams so we'll set the stream name as primary
     # Maybe we shouldn't use a stream name in the filename at all,
     # but for now we are maintaining backward-compatibility with existing names.
@@ -119,7 +125,7 @@ def tiff_export(uid, processed_uids):
 
 
 @task
-def csv_export(uid):
+def csv_export(ref):
 
     """
     Export each stream as a CSV file.
@@ -130,11 +136,12 @@ def csv_export(uid):
 
     Parameters
     ----------
-    uid: string
-        BlueskyRun uid
+    ref: string
+        Reference to a BlueskyRun. Can be a full uid, a partial uid,
+        a scan id, or an index (e.g. -1).
 
     """
-    run = tiled_client_raw[uid]
+    run = tiled_client_raw[ref]
     start = run.start
 
     base_directory = EXPORT_PATH / "auto" / start["project_name"]
@@ -170,18 +177,19 @@ def csv_export(uid):
 
 
 @task
-def json_export(uid):
+def json_export(ref):
 
     """
     Export start document into a json file.
 
     Parameters
     ----------
-    uid: string
-        BlueskyRun uid
+    ref: string
+        Reference to a BlueskyRun. Can be a full uid, a partial uid,
+        a scan id, or an index (e.g. -1).
 
     """
-    start = tiled_client_raw[uid].start
+    start = tiled_client_raw[ref].start
     directory = EXPORT_PATH / "auto" / start["project_name"] / f"{start['scan_id']}"
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -192,8 +200,8 @@ def json_export(uid):
 # Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
 with Flow("export") as flow:
-    uid = Parameter("uid")
-    processed_uids = write_dark_subtraction(uid)
-    tiff_export(uid, processed_uids)
-    csv_export(uid)
-    json_export(uid)
+    ref = Parameter("ref")
+    processed_uids = write_dark_subtraction(ref)
+    tiff_export(ref, processed_uids)
+    csv_export(ref)
+    json_export(ref)
