@@ -1,13 +1,11 @@
+import matplotlib.pyplot as plt
 import prefect
-from prefect import task, Flow, Parameter
+import PyHyperScattering
+from matplotlib.colors import LogNorm
+from prefect import Flow, Parameter, task
 from prefect.tasks.prefect import create_flow_run
 from prefect.triggers import all_finished
-
 from tiled.client import from_profile
-
-import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
-import PyHyperScattering
 
 print(f"{PyHyperScattering.__version__}")
 

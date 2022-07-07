@@ -1,12 +1,11 @@
-import sys
 import json
-import numpy
-
+import sys
 from pathlib import Path
+
+import numpy
+from prefect import Flow, Parameter, task
 from tiled.client import from_profile
 from tiled.queries import Eq
-from prefect import task, Flow, Parameter
-
 
 tiled_client = from_profile("nsls2", username=None)["rsoxs"]
 tiled_client_raw = tiled_client["raw"]
