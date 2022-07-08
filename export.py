@@ -156,7 +156,7 @@ def csv_export(ref):
         # >>> stream["data"].search(ArrayNdim(1))
         # to filter it down to only scalar fields.
         # For now we need to filter on the client side.
-        scalar_fields  = []
+        scalar_fields = []
         dataset = stream["data"]
         structure = dataset.structure()
         for field in dataset:
@@ -168,12 +168,11 @@ def csv_export(ref):
             if ndim == 1:
                 scalar_fields.append(field)
         if set(scalar_fields) == set(dataset):
-            scalar_fields=None
+            scalar_fields = None
         # WARNING: variables= might get renamed to fields= in future Tiled.
         dataset.export(
-            directory
-            / f"{start['scan_id']}-{start['sample_name']}-{stream_name}.csv",
-            variables=scalar_fields
+            directory / f"{start['scan_id']}-{start['sample_name']}-{stream_name}.csv",
+            variables=scalar_fields,
         )
 
 
@@ -194,7 +193,11 @@ def json_export(ref):
     directory = EXPORT_PATH / "auto" / start["project_name"] / f"{start['scan_id']}"
     directory.mkdir(parents=True, exist_ok=True)
 
-    with open(directory / f"{start['scan_id']}-{start['sample_name']}.json", "w", encoding="utf-8") as file:
+    with open(
+        directory / f"{start['scan_id']}-{start['sample_name']}.json",
+        "w",
+        encoding="utf-8",
+    ) as file:
         json.dump(start, file, ensure_ascii=False, indent=4)
 
 
