@@ -1,5 +1,5 @@
 import prefect
-from prefect import task, Flow, Parameter
+from prefect import Flow, Parameter, task
 from prefect.tasks.prefect import create_flow_run
 
 
