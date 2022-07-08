@@ -5,7 +5,6 @@ from pathlib import Path
 import numpy
 from prefect import Flow, Parameter, task
 from tiled.client import from_profile
-from tiled.queries import Eq
 
 tiled_client = from_profile("nsls2", username=None)["rsoxs"]
 tiled_client_raw = tiled_client["raw"]

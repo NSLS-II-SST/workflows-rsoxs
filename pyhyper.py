@@ -1,9 +1,8 @@
-import matplotlib.pyplot as plt
+import warnings
+
 import prefect
 import PyHyperScattering
-from matplotlib.colors import LogNorm
 from prefect import Flow, Parameter, task
-from prefect.tasks.prefect import create_flow_run
 from prefect.triggers import all_finished
 from tiled.client import from_profile
 
@@ -42,7 +41,8 @@ def write_run_artifacts(RUN_TO_PLOT):
     else:
         maskmethod = "none"
         warnings.warn(
-            f"Bad rsoxs_config, expected saxs or waxs but found {itp.rsoxs_config}.  This will disable masking and certainly cause issues later.",
+            f"Bad rsoxs_config, expected saxs or waxs but found {itp.rsoxs_config}. "
+            "This will disable masking and certainly cause issues later.",
             stacklevel=2,
         )
 
