@@ -119,7 +119,7 @@ def tiff_export(ref, processed_uids):
         for i in range(num_frames):
             dataset.export(
                 directory
-                / f"{start['scan_id']}-{start['sample_name']}-{STREAM_NAME}-{field}-{i:05d}.tif",
+                / f"{start['scan_id']}-{start['sample_name']}-{STREAM_NAME}-{field}-{i}.tiff",
                 slice=(i, 0),
             )
 
@@ -160,19 +160,20 @@ def csv_export(ref):
         dataset = stream["data"]
         structure = dataset.structure()
         for field in dataset:
+            # TODO: seq_num column
             # WARNING: Future Tiled release is highly likely to break this API
             # (but also provide the nicer way to do this described above).
             shape = structure.macro.data_vars[field].macro.variable.macro.shape
             ndim = len(shape)
             if ndim == 1:
                 scalar_fields.append(field)
+        if set(scalar_fields) == set(dataset):
+            scalar_fields=None
         # WARNING: variables= might get renamed to fields= in future Tiled.
-        # FIXME: Trying to get all the scalar_fields fails; we are limiting
-        # this to the first 20 to get this to run.
         dataset.export(
             directory
             / f"{start['scan_id']}-{start['sample_name']}-{stream_name}.csv",
-            variables=scalar_fields[:20]
+            variables=scalar_fields
         )
 
 
