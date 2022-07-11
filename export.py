@@ -174,7 +174,7 @@ def csv_export(ref):
         df2 = df.reset_index()  # Promote 'time' from index to column.
         df2.index.name = "seq_num"
         df3 = df2.reset_index()  # Promote 'seq_num' from index to column.
-        df3['seq_num'] += 1  # seq_num starts at 1
+        df3["seq_num"] += 1  # seq_num starts at 1
         df3.to_csv(
             directory / f"{start['scan_id']}-{start['sample_name']}-{stream_name}.csv",
             index=False,
