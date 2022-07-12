@@ -167,10 +167,17 @@ def csv_export(ref):
                 scalar_fields.append(field)
         if set(scalar_fields) == set(dataset):
             scalar_fields = None
-        # WARNING: variables= might get renamed to fields= in future Tiled.
-        dataset.export(
+        # We need a seq_num column, which the server does not include, so we
+        # do export on the client side.
+        ds = dataset.read(variables=scalar_fields)
+        df = ds.to_dataframe()
+        df2 = df.reset_index()  # Promote 'time' from index to column.
+        df2.index.name = "seq_num"
+        df3 = df2.reset_index()  # Promote 'seq_num' from index to column.
+        df3["seq_num"] += 1  # seq_num starts at 1
+        df3.to_csv(
             directory / f"{start['scan_id']}-{start['sample_name']}-{stream_name}.csv",
-            variables=scalar_fields,
+            index=False,
         )
 
 
