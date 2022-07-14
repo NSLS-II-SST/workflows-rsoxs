@@ -1,4 +1,6 @@
+import httpx
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -7,10 +9,27 @@ from prefect import Flow, Parameter, task
 from tiled.client import from_profile
 
 EXPORT_PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
+DATA_SESSION_PATTERN = re.compile("pass-([0-9]+)")
 
 tiled_client = from_profile("nsls2", username=None)["rsoxs"]
 tiled_client_raw = tiled_client["raw"]
 tiled_client_processed = tiled_client["sandbox"]
+
+
+def lookup_directory(start_doc):
+    """
+    Return the path for the proposal directory.
+
+    PASS gives us a *list* of cycles, and we have created a proposal directory under each cycle.
+    """
+
+    client = httpx.Client(base_url="https://api-staging.nsls2.bnl.gov")
+    data_session = start_doc["data_session"]  # works on old-style Header or new-style BlueskyRun
+    digits = int(DATA_SESSION_PATTERN.match(data_session).group(1))
+    response = client.get(f"/proposal/{digits}/directories")
+    response.raise_for_status()
+    path = Path(response.json()[0]['path'])
+    return path
 
 
 @task
@@ -220,8 +239,8 @@ def json_export(raw_ref):
         a scan id, or an index (e.g. -1).
 
     """
-    start = tiled_client_raw[raw_ref].start
-    directory = EXPORT_PATH / "auto" / start["project_name"] / f"{start['scan_id']}"
+    start_doc = tiled_client_raw[raw_ref].start
+    directory = lookup_directory(start_doc) / f"{start_doc['scan_id']}"
     directory.mkdir(parents=True, exist_ok=True)
 
     with open(
@@ -229,14 +248,14 @@ def json_export(raw_ref):
         "w",
         encoding="utf-8",
     ) as file:
-        json.dump(start, file, ensure_ascii=False, indent=4)
+        json.dump(start_doc, file, ensure_ascii=False, indent=4)
 
 
 # Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
 with Flow("export") as flow:
     raw_ref = Parameter("ref")
-    processed_refs = write_dark_subtraction(raw_ref)
-    tiff_export(raw_ref, processed_refs)
-    csv_export(raw_ref)
+    #processed_refs = write_dark_subtraction(raw_ref)
+    #tiff_export(raw_ref, processed_refs)
+    #csv_export(raw_ref)
     json_export(raw_ref)
