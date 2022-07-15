@@ -9,7 +9,6 @@ from prefect import Flow, Parameter, task
 from tiled.client import from_profile
 
 EXPORT_PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
-DATA_SESSION_PATTERN = re.compile("pass-([0-9]+)")
 
 tiled_client = from_profile("nsls2", username=None)["rsoxs"]
 tiled_client_raw = tiled_client["raw"]
@@ -22,14 +21,32 @@ def lookup_directory(start_doc):
 
     PASS gives us a *list* of cycles, and we have created a proposal directory under each cycle.
     """
-
+    DATA_SESSION_PATTERN = re.compile("pass-([0-9]+)")
+    
     client = httpx.Client(base_url="https://api-staging.nsls2.bnl.gov")
     data_session = start_doc["data_session"]  # works on old-style Header or new-style BlueskyRun
-    digits = int(DATA_SESSION_PATTERN.match(data_session).group(1))
+    
+    try:
+        digits = int(DATA_SESSION_PATTERN.match(data_session).group(1))
+    except AttributeError:
+        raise AttributeError(f"incorrect data_session: {data_session}")
+    
     response = client.get(f"/proposal/{digits}/directories")
     response.raise_for_status()
-    path = Path(response.json()[0]['path'])
-    return path
+
+    paths = [path_info['path'] for path_info in response.json()]
+
+    # Filter out paths from other beamlines.
+    paths = [path for path in paths if 'sst' == path.lower().split('/')[3]]
+
+    # Filter out paths from other cycles and paths for commisioning.
+    paths = [path for path in paths 
+             if path.lower().split('/')[5] == 'commissioning' 
+             or path.lower().split('/')[5] == start_doc['cycle']]
+
+    # There should be only one path remaining after these filters.
+    # Convert it to a pathlib.Path.
+    return Path(paths[0])
 
 
 @task
