@@ -1,7 +1,6 @@
 import prefect
 from prefect import Flow, Parameter, task
 from prefect.tasks.prefect import create_flow_run
-
 from tiled.client import from_profile
 
 tiled_client = from_profile("nsls2", username=None)["rsoxs"]
@@ -47,7 +46,7 @@ with Flow("end-of-run-workflow") as flow:
         flow_name="export", project_name="RSoXS", parameters={"ref": uid}
     )
     upstream_tasks.append(export_flow)
-    if found_fields and 'en_energy' in primary_fields:
+    if found_fields and "en_energy" in primary_fields:
         pyhyper_flow = create_flow_run(
             flow_name="pyhyper-flow", project_name="RSoXS", parameters={"scan_id": uid}
         )

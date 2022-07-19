@@ -1,15 +1,13 @@
-import warnings
-import httpx
-import json
 import re
-import sys
+import warnings
 from pathlib import Path
+
+import httpx
 import prefect
 import PyHyperScattering
 from prefect import Flow, Parameter, task
 from prefect.triggers import all_finished
 from tiled.client import from_profile
-
 
 PATH = "/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/"
 
@@ -23,7 +21,9 @@ def lookup_directory(start_doc):
     PASS gives us a *list* of cycles, and we have created a proposal directory under each cycle.
     """
     client = httpx.Client(base_url="https://api-staging.nsls2.bnl.gov")
-    data_session = start_doc["data_session"]  # works on old-style Header or new-style BlueskyRun
+    data_session = start_doc[
+        "data_session"
+    ]  # works on old-style Header or new-style BlueskyRun
 
     try:
         digits = int(DATA_SESSION_PATTERN.match(data_session).group(1))
@@ -33,15 +33,18 @@ def lookup_directory(start_doc):
     response = client.get(f"/proposal/{digits}/directories")
     response.raise_for_status()
 
-    paths = [path_info['path'] for path_info in response.json()]
+    paths = [path_info["path"] for path_info in response.json()]
 
     # Filter out paths from other beamlines.
-    paths = [path for path in paths if 'sst' == path.lower().split('/')[3]]
+    paths = [path for path in paths if "sst" == path.lower().split("/")[3]]
 
     # Filter out paths from other cycles and paths for commisioning.
-    paths = [path for path in paths
-             if path.lower().split('/')[5] == 'commissioning'
-             or path.lower().split('/')[5] == start_doc['cycle']]
+    paths = [
+        path
+        for path in paths
+        if path.lower().split("/")[5] == "commissioning"
+        or path.lower().split("/")[5] == start_doc["cycle"]
+    ]
 
     # There should be only one path remaining after these filters.
     # Convert it to a pathlib.Path.
@@ -103,11 +106,11 @@ def write_run_artifacts(scan_id):
 
     logger.info("Saving Nexus file")
 
-    data_path = lookup_directory(c['rsoxs']['raw'].start)
-    logger.info(f'writing to {data_path}')
-    #try:
+    data_path = lookup_directory(c["rsoxs"]["raw"].start)
+    logger.info(f"writing to {data_path}")
+    # try:
     integratedimages.fileio.saveNexus(f"{PATH}reduced_{scan_id}_{name}.nxs")
-    #except Exception:
+    # except Exception:
     #    logger.warning("Couldn't save as NeXus file.")
     logger.info("Done!")
     return integratedimages
