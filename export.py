@@ -5,6 +5,7 @@ from pathlib import Path
 
 import httpx
 import numpy
+import prefect
 from prefect import Flow, Parameter, task
 from tiled.client import from_profile
 
@@ -21,8 +22,7 @@ def lookup_directory(start_doc):
 
     PASS gives us a *list* of cycles, and we have created a proposal directory under each cycle.
     """
-    DATA_SESSION_PATTERN = re.compile("pass-([0-9]+)")
-
+    DATA_SESSION_PATTERN = re.compile("[GUPCpass]*-([0-9]+)")
     client = httpx.Client(base_url="https://api-staging.nsls2.bnl.gov")
     data_session = start_doc[
         "data_session"
@@ -74,6 +74,9 @@ def write_dark_subtraction(ref):
     results: dict
         A dictionary that maps field_name to the matching processed uid.
     """
+
+    logger = prefect.context.get("logger")
+    logger.info("starting dark subtraction")
 
     def safe_subtract(light, dark, pedestal=100):
         """
@@ -136,6 +139,9 @@ def write_dark_subtraction(ref):
             },
         )
         results[field] = processed_uid
+
+    logger.info("completed dark subtraction")
+
     return results
 
 
@@ -159,10 +165,17 @@ def tiff_export(raw_ref, processed_refs):
     # but for now we are maintaining backward-compatibility with existing names.
     STREAM_NAME = "primary"
 
-    start = tiled_client_raw[raw_ref].start
-
-    directory = EXPORT_PATH / "auto" / start["project_name"] / f"{start['scan_id']}"
+    start_doc = tiled_client_raw[raw_ref].start
+    directory = (
+        lookup_directory(start_doc)
+        / start_doc["project_name"]
+        / f"{start_doc['scan_id']}"
+    )
     directory.mkdir(parents=True, exist_ok=True)
+
+    logger = prefect.context.get("logger")
+    logger.info(f"starting tiff export to {directory}")
+
     for field, processed_uid in processed_refs.items():
         dataset = tiled_client_processed[processed_uid]
         assert field == dataset.metadata["field"]
@@ -170,9 +183,11 @@ def tiff_export(raw_ref, processed_refs):
         for i in range(num_frames):
             dataset.export(
                 directory
-                / f"{start['scan_id']}-{start['sample_name']}-{STREAM_NAME}-{field}-{i}.tiff",
+                / f"{start_doc['scan_id']}-{start_doc['sample_name']}-{STREAM_NAME}-{field}-{i}.tiff",
                 slice=(i, 0),
             )
+
+    logger.info(f"wrote tiff files to: {directory}")
 
 
 @task
@@ -192,14 +207,17 @@ def csv_export(raw_ref):
         a scan id, or an index (e.g. -1).
 
     """
+
     run = tiled_client_raw[raw_ref]
     start = run.start
 
     # Make the directories.
-    base_directory = EXPORT_PATH / "auto" / start["project_name"]
+    start_doc = tiled_client_raw[raw_ref].start
+    base_directory = lookup_directory(start_doc) / start_doc["project_name"]
     base_directory.mkdir(parents=True, exist_ok=True)
-    stream_directory = base_directory / f"{start['scan_id']}"
-    stream_directory.mkdir(parents=True, exist_ok=True)
+
+    logger = prefect.context.get("logger")
+    logger.info(f"starting csv export to {base_directory}")
 
     def is_scalar(structure, field):
         """
@@ -233,6 +251,7 @@ def csv_export(raw_ref):
         # Figure out the directory to write to.
         scan_directory = f"{start['scan_id']}" if stream_name != "primary" else "."
         directory = base_directory / scan_directory
+        directory.mkdir(parents=True, exist_ok=True)
 
         # Prepare the data.
         dataset = stream["data"]
@@ -246,6 +265,8 @@ def csv_export(raw_ref):
             directory / f"{start['scan_id']}-{start['sample_name']}-{stream_name}.csv",
             index=False,
         )
+
+    logger.info(f"wrote csv files to: {directory}")
 
 
 @task
@@ -262,8 +283,15 @@ def json_export(raw_ref):
 
     """
     start_doc = tiled_client_raw[raw_ref].start
-    directory = lookup_directory(start_doc) / f"{start_doc['scan_id']}"
+    directory = (
+        lookup_directory(start_doc)
+        / start_doc["project_name"]
+        / f"{start_doc['scan_id']}"
+    )
     directory.mkdir(parents=True, exist_ok=True)
+
+    logger = prefect.context.get("logger")
+    logger.info(f"starting json export to {directory}")
 
     with open(
         directory / f"{start_doc['scan_id']}-{start_doc['sample_name']}.json",
@@ -272,12 +300,16 @@ def json_export(raw_ref):
     ) as file:
         json.dump(start_doc, file, ensure_ascii=False, indent=4)
 
+    logger.info(
+        f'wrote json file to: {str(directory / str(start_doc["scan_id"]))}-{start_doc["sample_name"]}.json'
+    )
+
 
 # Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
 with Flow("export") as flow:
     raw_ref = Parameter("ref")
-    # processed_refs = write_dark_subtraction(raw_ref)
-    # tiff_export(raw_ref, processed_refs)
-    # csv_export(raw_ref)
+    processed_refs = write_dark_subtraction(raw_ref)
+    tiff_export(raw_ref, processed_refs)
+    csv_export(raw_ref)
     json_export(raw_ref)
