@@ -104,8 +104,9 @@ def write_dark_subtraction(ref):
 
     run = tiled_client_raw[ref]
     full_uid = run.start["uid"]
-    primary_data = run["primary"]["data"]
-    dark_data = run["dark"]["data"]
+    # Access the primary and dark streams as xarray.Datasets.
+    primary_data = run["primary"]["data"].read()
+    dark_data = run["dark"]["data"].read()
 
     # The set of fields that should be exported if found in the scan.
     export_fields = {
