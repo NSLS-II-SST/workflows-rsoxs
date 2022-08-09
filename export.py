@@ -130,7 +130,7 @@ def write_dark_subtraction(ref):
         light = primary_data[field][:]
         dark = dark_data[field][:]
         subtracted = safe_subtract(light, dark)
-        processed_uid = tiled_client_processed.write_array(
+        processed_array_client = tiled_client_processed.write_array(
             subtracted.data,
             metadata={
                 "field": field,
@@ -139,7 +139,7 @@ def write_dark_subtraction(ref):
                 "operation": "dark subtraction",
             },
         )
-        results[field] = processed_uid
+        results[field] = processed_array_client.item["id"]
 
     logger.info("completed dark subtraction")
 
