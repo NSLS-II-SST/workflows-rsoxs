@@ -247,7 +247,8 @@ def csv_export(raw_ref):
         # Prepare the data.
         dataset = stream["data"]
         scalar_fields = {field for field in dataset if dataset[field].ndim == 1}
-        ds = dataset.read(variables=scalar_fields)
+        # TODO Drop optimize_wide_table=False when tiled bug is fixed.
+        ds = dataset.read(variables=scalar_fields, optimize_wide_table=False)
         dataframe = add_seq_num(ds)
 
         # Write the data.
