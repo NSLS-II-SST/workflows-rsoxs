@@ -220,17 +220,6 @@ def csv_export(raw_ref):
     logger = prefect.context.get("logger")
     logger.info(f"starting csv export to {base_directory}")
 
-    def is_scalar(structure, field):
-        """
-        Checks if a field is scalar.
-        """
-        # TODO Soon Tiled will support
-        # >>> stream["data"].search(ArrayNdim(1))
-        # to filter it down to only scalar fields.
-        # For now we need to filter on the client side.
-        shape = structure.macro.data_vars[field].macro.variable.macro.shape
-        return len(shape) == 1
-
     def add_seq_num(dataset):
         """
         Add a seq_num collumn to the dataset.
@@ -256,8 +245,7 @@ def csv_export(raw_ref):
 
         # Prepare the data.
         dataset = stream["data"]
-        structure = dataset.structure()
-        scalar_fields = {field for field in dataset if is_scalar(structure, field)}
+        scalar_fields = {field for field in dataset if dataset[field].ndim == 1}
         ds = dataset.read(variables=scalar_fields)
         dataframe = add_seq_num(ds)
 
