@@ -1,3 +1,4 @@
+from datetime import timedelta
 import json
 import re
 import sys
@@ -7,7 +8,9 @@ import httpx
 import numpy
 import prefect
 from prefect import Flow, Parameter, task
+from prefect.triggers import all_successful
 from tiled.client import from_profile, show_logs
+
 
 EXPORT_PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
 
@@ -104,7 +107,17 @@ def write_dark_subtraction(ref):
         ).astype(light.dtype)
 
     run = tiled_client_raw[ref]
+
     full_uid = run.start["uid"]
+    logger.info(f"{full_uid = }")
+
+    # Rasie an exception if the dark stream isn't present
+    if "dark" not in run:
+        logger.warning(
+            "dark stream does not exist in this run. Skipping dark subtraction and tiff export."
+        )
+        raise Exception("dark stream does not exist")
+
     # Access the primary and dark streams as xarray.Datasets.
     primary_data = run["primary"]["data"].read()
     dark_data = run["dark"]["data"].read()
@@ -147,7 +160,8 @@ def write_dark_subtraction(ref):
     return results
 
 
-@task
+# Make sure this only runs when the dark subtraction is successful
+@task(trigger=all_successful)
 def tiff_export(raw_ref, processed_refs):
 
     """
@@ -183,16 +197,15 @@ def tiff_export(raw_ref, processed_refs):
         assert field == dataset.metadata["field"]
         num_frames = len(dataset)
         for i in range(num_frames):
-            dataset.export(
-                directory
-                / f"{start_doc['scan_id']}-{start_doc['sample_name']}-{STREAM_NAME}-{field}-{i}.tiff",
-                slice=(i, 0),
-            )
+            filename = f"{start_doc['scan_id']}-{start_doc['sample_name']}-{STREAM_NAME}-{field}-{i}.tiff"
+            logger.info(f"Exporting {filename}")
+            dataset.export(directory / filename, slice=(i, 0))
 
     logger.info(f"wrote tiff files to: {directory}")
 
 
-@task
+# Retry this task if it fails
+@task(max_retries=2, retry_delay=timedelta(seconds=10))
 def csv_export(raw_ref):
 
     """
@@ -238,6 +251,7 @@ def csv_export(raw_ref):
         return df3
 
     for stream_name, stream in run.items():
+        logger.info(f"Exporting csv for stream {stream_name}")
 
         # Figure out the directory to write to.
         scan_directory = f"{start['scan_id']}" if stream_name != "primary" else "."
@@ -296,11 +310,29 @@ def json_export(raw_ref):
     )
 
 
+@task
+def wait_for_all_tasks():
+    logger = prefect.context.get("logger")
+    logger.info("All tasks complete")
+
+
 # Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
 with Flow("export") as flow:
     raw_ref = Parameter("ref")
     processed_refs = write_dark_subtraction(raw_ref)
-    tiff_export(raw_ref, processed_refs)
-    csv_export(raw_ref)
-    json_export(raw_ref)
+    tiff_export_task = tiff_export(raw_ref, processed_refs)
+    csv_export_task = csv_export(raw_ref)
+    json_export_task = json_export(raw_ref)
+    wait_for_all_tasks(
+        upstream_tasks=[
+            processed_refs,
+            tiff_export_task,
+            csv_export_task,
+            json_export_task,
+        ]
+    )
+
+# This line will mark this flow as succeeded based on
+# the csv and json export tasks succeeding.
+flow.set_reference_tasks([csv_export_task, json_export_task])

@@ -1,7 +1,8 @@
 import re
 import warnings
+import pyFAI
 from pathlib import Path
-
+#test
 import httpx
 import prefect
 import PyHyperScattering
@@ -20,6 +21,7 @@ def lookup_directory(start_doc):
 
     PASS gives us a *list* of cycles, and we have created a proposal directory under each cycle.
     """
+    DATA_SESSION_PATTERN = re.compile("[GUPCpass]*-([0-9]+)")
     client = httpx.Client(base_url="https://api-staging.nsls2.bnl.gov")
     data_session = start_doc[
         "data_session"
@@ -59,57 +61,25 @@ def write_run_artifacts(scan_id):
     Parameters:
         run_to_plot (int): the local scan id from DataBroker
     """
-    # Prefect logger
+    start_doc = tiled_client_raw[scan_id].start
+    directory = (
+            lookup_directory(start_doc)
+            / start_doc["project_name"]
+            / f"{start_doc['scan_id']}"
+    )
+    directory.mkdir(parents=True, exist_ok=True)
+
     logger = prefect.context.get("logger")
-    logger.info("Starting...")
+    logger.info(f"starting pyhyper export to {directory}")
+
     logger.info(f"{PyHyperScattering.__version__}")
 
     c = from_profile("nsls2", username=None)
     logger.info("Loaded RSoXS Profile...")
-    rsoxsload = PyHyperScattering.load.SST1RSoXSDB(
-        corr_mode="none", catalog=c["rsoxs"]["raw"]
-    )
+
 
     logger.info("created RSoXS catalog loader...")
-    itp = rsoxsload.loadRun(c["rsoxs"]["raw"][scan_id], dims=["energy"])
 
-    logger.info("Getting mask")
-    if itp.rsoxs_config == "waxs":
-        maskmethod = "nika"
-        mask = "/nsls2/data/sst/legacy/RSoXS/analysis/SST1_WAXS_mask.hdf"
-    elif itp.rsoxs_config == "saxs":
-        maskmethod = "nika"
-        mask = "/nsls2/data/sst/legacy/RSoXS/analysis/SST1-SAXS_mask.hdf"
-    else:
-        maskmethod = "none"
-        warnings.warn(
-            f"Bad rsoxs_config, expected saxs or waxs but found {itp.rsoxs_config}. "
-            "This will disable masking and certainly cause issues later.",
-            stacklevel=2,
-        )
-
-    logger.info("PFEnergySeriesIntegrator")
-    integ = PyHyperScattering.integrate.PFEnergySeriesIntegrator(
-        maskmethod=maskmethod,
-        maskpath=mask,
-        geomethod="template_xr",
-        template_xr=itp,
-        integration_method="csr_ocl",
-    )
-
-    name = itp.attrs["sample_name"]
-
-    # DataArray
-    logger.info("integrateImageStack")
-    # add a data check if this is the right format at all
-    integratedimages = integ.integrateImageStack(itp)
-
-    logger.info("Saving Nexus file")
-
-    data_path = lookup_directory(c["rsoxs"]["raw"].start)
-    logger.info(f"writing to {data_path}")
-    # try:
-    integratedimages.fileio.saveNexus(f"{PATH}reduced_{scan_id}_{name}.nxs")
     # except Exception:
     #    logger.warning("Couldn't save as NeXus file.")
     logger.info("Done!")
