@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 import prefect
 import PyHyperScattering
-from prefect import Flow, Parameter, task
+from prefect import flow, task, get_run_logger
 from prefect.triggers import all_finished
 from tiled.client import from_profile
 
@@ -69,7 +69,7 @@ def write_run_artifacts(scan_id):
     )
     directory.mkdir(parents=True, exist_ok=True)
 
-    logger = prefect.context.get("logger")
+    logger = get_run_logger()
     logger.info(f"starting pyhyper export to {directory}")
 
     logger.info(f"{PyHyperScattering.__version__}")
@@ -87,14 +87,12 @@ def write_run_artifacts(scan_id):
 
 
 @task
-def log_status(trigger=all_finished):
-    logger = prefect.context.get("logger")
+def log_status():
+    logger = get_run_logger()
     logger.info("Done!")
 
 
-with Flow("pyhyper-flow") as flow:
-    scan_id = Parameter("scan_id", default=36106)
-    da = write_run_artifacts(scan_id)
-
-    # check start document if pyhyper reduction is needed
-    log_status(upstream_tasks=[da])
+@flow
+def pyhyper_flow(scan_id=36106):
+    write_run_artifacts(scan_id)
+    log_status()
