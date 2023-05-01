@@ -8,7 +8,6 @@ import httpx
 import numpy
 import prefect
 from prefect import flow, task, get_run_logger
-from prefect.triggers import all_successful
 from tiled.client import from_profile, show_logs
 
 
@@ -320,9 +319,10 @@ def wait_for_all_tasks():
 @flow
 def export(ref):
     processed_refs = write_dark_subtraction(ref)
-    tiff_export_task = tiff_export(ref, processed_refs)
-    csv_export_task = csv_export(ref)
-    json_export_task = json_export(ref)
+    if processed_refs:
+        tiff_export(ref, processed_refs)
+    csv_export(ref)
+    json_export(ref)
     wait_for_all_tasks()
 
 # This line will mark this flow as succeeded based on
