@@ -7,7 +7,6 @@ import httpx
 import prefect
 import PyHyperScattering
 from prefect import flow, task, get_run_logger
-from prefect.triggers import all_finished
 from tiled.client import from_profile
 
 PATH = "/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/"
