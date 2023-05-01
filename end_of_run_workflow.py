@@ -1,6 +1,7 @@
 from prefect import task, flow, get_run_logger
 from data_validation import data_validation
 from tiled.client import from_profile
+from export import export
 
 @task
 def log_completion():
