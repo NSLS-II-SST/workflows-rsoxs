@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 import numpy
 import prefect
-from prefect import Flow, Parameter, task
+from prefect import flow, task, get_run_logger
 from prefect.triggers import all_successful
 from tiled.client import from_profile, show_logs
 
@@ -79,7 +79,7 @@ def write_dark_subtraction(ref):
         A dictionary that maps field_name to the matching processed uid.
     """
 
-    logger = prefect.context.get("logger")
+    logger = get_run_logger()
     logger.info("starting dark subtraction")
 
     def safe_subtract(light, dark, pedestal=100):
@@ -161,7 +161,7 @@ def write_dark_subtraction(ref):
 
 
 # Make sure this only runs when the dark subtraction is successful
-@task(trigger=all_successful)
+@task
 def tiff_export(raw_ref, processed_refs):
 
     """
@@ -189,7 +189,7 @@ def tiff_export(raw_ref, processed_refs):
     )
     directory.mkdir(parents=True, exist_ok=True)
 
-    logger = prefect.context.get("logger")
+    logger = get_run_logger()
     logger.info(f"starting tiff export to {directory}")
 
     for field, processed_uid in processed_refs.items():
@@ -205,7 +205,7 @@ def tiff_export(raw_ref, processed_refs):
 
 
 # Retry this task if it fails
-@task(max_retries=2, retry_delay=timedelta(seconds=10))
+@task(retries=2, retry_delay_seconds=10)
 def csv_export(raw_ref):
 
     """
@@ -231,7 +231,7 @@ def csv_export(raw_ref):
     base_directory = lookup_directory(start_doc) / start_doc["project_name"]
     base_directory.mkdir(parents=True, exist_ok=True)
 
-    logger = prefect.context.get("logger")
+    logger = get_run_logger()
     logger.info(f"starting csv export to {base_directory}")
 
     def add_seq_num(dataset):
@@ -261,8 +261,7 @@ def csv_export(raw_ref):
         # Prepare the data.
         dataset = stream["data"]
         scalar_fields = {field for field in dataset if dataset[field].ndim == 1}
-        # TODO Drop optimize_wide_table=False when tiled bug is fixed.
-        ds = dataset.read(variables=scalar_fields, optimize_wide_table=False)
+        ds = dataset.read(variables=scalar_fields)
         dataframe = add_seq_num(ds)
 
         # Write the data.
@@ -295,7 +294,7 @@ def json_export(raw_ref):
     )
     directory.mkdir(parents=True, exist_ok=True)
 
-    logger = prefect.context.get("logger")
+    logger = get_run_logger()
     logger.info(f"starting json export to {directory}")
 
     with open(
@@ -312,27 +311,21 @@ def json_export(raw_ref):
 
 @task
 def wait_for_all_tasks():
-    logger = prefect.context.get("logger")
+    logger = get_run_logger()
     logger.info("All tasks complete")
 
 
 # Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
-with Flow("export") as flow:
-    raw_ref = Parameter("ref")
-    processed_refs = write_dark_subtraction(raw_ref)
-    tiff_export_task = tiff_export(raw_ref, processed_refs)
-    csv_export_task = csv_export(raw_ref)
-    json_export_task = json_export(raw_ref)
-    wait_for_all_tasks(
-        upstream_tasks=[
-            processed_refs,
-            tiff_export_task,
-            csv_export_task,
-            json_export_task,
-        ]
-    )
+@flow
+def export(ref):
+    processed_refs = write_dark_subtraction(ref)
+    tiff_export_task = tiff_export(ref, processed_refs)
+    csv_export_task = csv_export(ref)
+    json_export_task = json_export(ref)
+    wait_for_all_tasks()
 
 # This line will mark this flow as succeeded based on
 # the csv and json export tasks succeeding.
-flow.set_reference_tasks([csv_export_task, json_export_task])
+# TODO: Do we need this line?
+#flow.set_reference_tasks([csv_export_task, json_export_task])
