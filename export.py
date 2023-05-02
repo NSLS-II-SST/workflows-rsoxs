@@ -308,22 +308,15 @@ def json_export(raw_ref):
     )
 
 
-@task
-def wait_for_all_tasks():
-    logger = get_run_logger()
-    logger.info("All tasks complete")
-
-
 # Make the Prefect Flow.
 # A separate command is needed to register it with the Prefect server.
 @flow
 def export(ref):
+    csv_export(ref)
+    json_export(ref)
     processed_refs = write_dark_subtraction(ref)
     if processed_refs:
         tiff_export(ref, processed_refs)
-    csv_export(ref)
-    json_export(ref)
-    wait_for_all_tasks()
 
 # This line will mark this flow as succeeded based on
 # the csv and json export tasks succeeding.
