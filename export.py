@@ -1,12 +1,10 @@
-from datetime import timedelta
 import json
 import re
 import sys
-from pathlib import Path
-
 import httpx
 import numpy
-import prefect
+
+from pathlib import Path
 from prefect import flow, task, get_run_logger
 from tiled.client import from_profile, show_logs
 
@@ -59,7 +57,6 @@ def lookup_directory(start_doc):
 
 @task
 def write_dark_subtraction(ref):
-
     """
     This is a Prefect task that perform dark subtraction.
 
@@ -163,7 +160,6 @@ def write_dark_subtraction(ref):
 # Make sure this only runs when the dark subtraction is successful
 @task
 def tiff_export(raw_ref, processed_refs):
-
     """
     Export processed data into a tiff file.
 
@@ -207,7 +203,6 @@ def tiff_export(raw_ref, processed_refs):
 # Retry this task if it fails
 @task(retries=2, retry_delay_seconds=10)
 def csv_export(raw_ref):
-
     """
     Export each stream as a CSV file.
 
@@ -275,7 +270,6 @@ def csv_export(raw_ref):
 
 @task
 def json_export(raw_ref):
-
     """
     Export start document into a json file.
 
@@ -319,7 +313,8 @@ def export(ref):
     if processed_refs:
         tiff_export(ref, processed_refs)
 
+
 # This line will mark this flow as succeeded based on
 # the csv and json export tasks succeeding.
 # TODO: Do we need this line?
-#flow.set_reference_tasks([csv_export_task, json_export_task])
+# flow.set_reference_tasks([csv_export_task, json_export_task])

@@ -1,11 +1,9 @@
 import re
-import warnings
 import pyFAI
-from pathlib import Path
-#test
 import httpx
-import prefect
 import PyHyperScattering
+
+from pathlib import Path
 from prefect import flow, task, get_run_logger
 from tiled.client import from_profile
 
@@ -62,9 +60,9 @@ def write_run_artifacts(scan_id):
     """
     start_doc = tiled_client_raw[scan_id].start
     directory = (
-            lookup_directory(start_doc)
-            / start_doc["project_name"]
-            / f"{start_doc['scan_id']}"
+        lookup_directory(start_doc)
+        / start_doc["project_name"]
+        / f"{start_doc['scan_id']}"
     )
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -75,7 +73,6 @@ def write_run_artifacts(scan_id):
 
     c = from_profile("nsls2", username=None)
     logger.info("Loaded RSoXS Profile...")
-
 
     logger.info("created RSoXS catalog loader...")
 
