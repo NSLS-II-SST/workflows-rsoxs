@@ -110,12 +110,13 @@ def write_dark_subtraction(ref):
     full_uid = run.start["uid"]
     logger.info(f"{full_uid = }")
 
-    # Rasie an exception if the dark stream isn't present
+    # Raise an exception if the dark stream isn't present
     if "dark" not in run:
         logger.warning(
             "dark stream does not exist in this run. Skipping dark subtraction and tiff export."
         )
-        raise Exception("dark stream does not exist")
+        return
+        # raise Exception("dark stream does not exist")
 
     # Access the primary and dark streams as xarray.Datasets.
     primary_data = run["primary"]["data"].read()
