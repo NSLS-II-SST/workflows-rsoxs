@@ -195,7 +195,7 @@ def tiff_export(raw_ref, processed_refs):
         for i in range(num_frames):
             filename = f"{start_doc['scan_id']}-{start_doc['sample_name']}-{STREAM_NAME}-{field}-{i}.tiff"
             logger.info(f"Exporting {filename}")
-            dataset.export(directory / filename, slice=(i))
+            dataset.export(directory / filename, slice=(i,...))
 
     logger.info(f"wrote tiff files to: {directory}")
 
