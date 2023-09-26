@@ -12,7 +12,7 @@ from tiled.client import from_profile, show_logs
 EXPORT_PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
 
 show_logs()
-tiled_client = from_profile("nsls2", username=None)["rsoxs"]
+tiled_client = from_profile("nsls2")["rsoxs"]
 tiled_client_raw = tiled_client["raw"]
 tiled_client_processed = tiled_client["sandbox"]
 
