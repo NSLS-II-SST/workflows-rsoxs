@@ -71,7 +71,7 @@ def write_run_artifacts(scan_id):
 
     logger.info(f"{PyHyperScattering.__version__}")
 
-    c = from_profile("nsls2", username=None)
+    c = from_profile("nsls2")
     logger.info("Loaded RSoXS Profile...")
 
     logger.info("created RSoXS catalog loader...")

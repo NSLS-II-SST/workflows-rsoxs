@@ -3,7 +3,7 @@ import time
 from prefect import task, flow, get_run_logger
 from tiled.client import from_profile
 
-tiled_client = from_profile("nsls2", username=None)
+tiled_client = from_profile("nsls2")
 
 
 @task(retries=2, retry_delay_seconds=10)
