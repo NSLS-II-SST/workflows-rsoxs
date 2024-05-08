@@ -99,7 +99,7 @@ def write_dark_subtraction(ref):
         dark = numpy.clip(dark, a_min=0, a_max=None)
 
         return numpy.clip(
-            light - dark.reindex_like(light, "ffill"), a_min=0, a_max=None
+            light - dark.reindex_like(light, "ffill").data, a_min=0, a_max=None
         ).astype(light.dtype)
 
     run = tiled_client_raw[ref]
