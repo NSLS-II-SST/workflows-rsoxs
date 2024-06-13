@@ -24,7 +24,7 @@ def lookup_directory(start_doc):
     PASS gives us a *list* of cycles, and we have created a proposal directory under each cycle.
     """
     DATA_SESSION_PATTERN = re.compile("[GUPCpass]*-([0-9]+)")
-    client = httpx.Client(base_url="https://api-staging.nsls2.bnl.gov")
+    client = httpx.Client(base_url="https://api.nsls2.bnl.gov")
     data_session = start_doc[
         "data_session"
     ]  # works on old-style Header or new-style BlueskyRun
@@ -34,10 +34,10 @@ def lookup_directory(start_doc):
     except AttributeError:
         raise AttributeError(f"incorrect data_session: {data_session}")
 
-    response = client.get(f"/proposal/{digits}/directories")
+    response = client.get(f"/v1/proposal/{digits}/directories")
     response.raise_for_status()
 
-    paths = [path_info["path"] for path_info in response.json()]
+    paths = [path_info["path"] for path_info in response.json()['directories']]
 
     # Filter out paths from other beamlines.
     paths = [path for path in paths if "sst" == path.lower().split("/")[3]]
