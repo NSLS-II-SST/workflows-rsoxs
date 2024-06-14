@@ -104,7 +104,7 @@ def write_dark_subtraction(ref):
     run = tiled_client_raw[ref]
 
     full_uid = run.start["uid"]
-    logger.info(f"{full_uid = }")
+    logger.info(f"{full_uid = }")  # noqa: E202,E251
 
     # Raise an exception if the dark stream isn't present
     if "dark" not in run:
