@@ -13,14 +13,14 @@ def read_all_streams(uid, beamline_acronym="rsoxs"):
     logger.info(f"Validating uid {run.start['uid']}")
     start_time = time.monotonic()
     for stream in run:
-        logger.info(f"{stream}:")
+        logger.info(f"{stream}...")
         stream_start_time = time.monotonic()
         stream_data = run[stream].read()
         stream_elapsed_time = time.monotonic() - stream_start_time
         logger.info(f"{stream} elapsed_time = {stream_elapsed_time}")
-        logger.info(f"{stream} nbytes = {stream_data.nbytes:_}")
+        logger.info(f"{stream} nbytes = {stream_data.nbytes: _}")
     elapsed_time = time.monotonic() - start_time
-    logger.info(f"{elapsed_time = }")
+    logger.info(f"{elapsed_time = }")  # noqa: E202,E251
 
 
 @flow
