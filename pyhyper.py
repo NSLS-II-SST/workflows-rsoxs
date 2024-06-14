@@ -1,10 +1,10 @@
 import re
-import pyFAI
-import httpx
-import PyHyperScattering
-
 from pathlib import Path
-from prefect import flow, task, get_run_logger
+
+import httpx
+import pyFAI
+import PyHyperScattering
+from prefect import flow, get_run_logger, task
 from tiled.client import from_profile
 
 PATH = "/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/"
