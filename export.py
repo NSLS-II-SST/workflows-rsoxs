@@ -1,13 +1,12 @@
 import json
 import re
 import sys
+from pathlib import Path
+
 import httpx
 import numpy
-
-from pathlib import Path
-from prefect import flow, task, get_run_logger
+from prefect import flow, get_run_logger, task
 from tiled.client import from_profile, show_logs
-
 
 EXPORT_PATH = Path("/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/")
 
@@ -37,7 +36,7 @@ def lookup_directory(start_doc):
     response = client.get(f"/v1/proposal/{digits}/directories")
     response.raise_for_status()
 
-    paths = [path_info["path"] for path_info in response.json()['directories']]
+    paths = [path_info["path"] for path_info in response.json()["directories"]]
 
     # Filter out paths from other beamlines.
     paths = [path for path in paths if "sst" == path.lower().split("/")[3]]
@@ -105,7 +104,7 @@ def write_dark_subtraction(ref):
     run = tiled_client_raw[ref]
 
     full_uid = run.start["uid"]
-    logger.info(f"{full_uid = }")
+    logger.info(f"{full_uid = }")  # noqa: E202,E251
 
     # Raise an exception if the dark stream isn't present
     if "dark" not in run:

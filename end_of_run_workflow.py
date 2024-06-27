@@ -1,5 +1,6 @@
-from prefect import task, flow, get_run_logger
-from data_validation import general_data_validation
+from prefect import flow, get_run_logger, task
+
+# from data_validation import general_data_validation
 from export import export
 
 
