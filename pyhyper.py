@@ -3,13 +3,14 @@ from pathlib import Path
 
 import httpx
 import PyHyperScattering
-from prefect import get_run_logger, task
+from prefect import get_run_logger, task, flow
+from tiled.client import from_profile
+from tiled.client.xarray import write_xarray_dataset
+
 
 PATH = "/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/"
 
 DATA_SESSION_PATTERN = re.compile("[passGUCP]*-([0-9]+)")
-from tiled.client import from_profile
-from tiled.client.xarray import write_xarray_dataset
 
 
 @task
@@ -57,15 +58,15 @@ def load_reduce_and_write_to_tiled(scanid):
 
 """
 def auto_reduce_recent_data_if_not_reduced(number):
-	for scan_ref in range (-number,-1):
-		try:
-			if load.c[scan_ref].stop is not None: # if the scan is currently running, stop will be None.
-				local_scan_id = load.c[scan_ref].metadata['summary']['scan_id']
-				if len(analyzed_tiled.search(Eq('attrs.start.scan_id',local_scan_id))) > 0:
-				    continue
-				load_reduce_and_write_to_tiled(scan_ref)
-		except Exception as e:
-			print(f'error in processing {scan_ref}, {e}')
+    for scan_ref in range (-number,-1):
+        try:
+            if load.c[scan_ref].stop is not None: # if the scan is currently running, stop will be None.
+                local_scan_id = load.c[scan_ref].metadata['summary']['scan_id']
+                if len(analyzed_tiled.search(Eq('attrs.start.scan_id',local_scan_id))) > 0:
+                    continue
+                load_reduce_and_write_to_tiled(scan_ref)
+        except Exception as e:
+            print(f'error in processing {scan_ref}, {e}')
 
 """
 
@@ -110,7 +111,8 @@ def lookup_directory(start_doc):
 
 @flow
 def pyhyper_flow(scan_id=36106):
-    scan = load_reduce_and_write_to_tiled(scan_id)
+    load_reduce_and_write_to_tiled(scan_id)
+    # scan = load_reduce_and_write_to_tiled(scan_id)
     # TODO: decide and save these artifacts write_run_artifacts(scan)
     log_status()
 
