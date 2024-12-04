@@ -2,8 +2,6 @@ import re
 from pathlib import Path
 
 import httpx
-
-
 import PyHyperScattering
 from prefect import get_run_logger, task
 
@@ -13,30 +11,38 @@ DATA_SESSION_PATTERN = re.compile("[passGUCP]*-([0-9]+)")
 from tiled.client import from_profile
 from tiled.client.xarray import write_xarray_dataset
 
+
 @task
-def load_and_reduce(scanid,override_bcx = None, override_bcy = None, override_dist = None, override_mask = None):
-     scan = load.loadRun(scanid)
-     scan_us = scan.unstack('system') # this is expensive, do it only once
-     if 'energy' in scan_us.dims:
-         integrator = PyHyperScattering.integrate.PFEnergySeriesIntegrator
-     else:
-         integrator = PyHyperScattering.integrate.PFGeneralIntegrator
-     integrator = integrator(integration_method='csr',geomethod='template_xr',template_xr=scan)
-     if override_bcx is not None:
-         integrator.ni_beamcenter_x = override_bcx
-     if override_bcy is not None:
-         integrator.ni_beamcenter_y = override_bcy
-     if override_dist is not None:
-         integrator.ni_distance = override_dist
-     if override_mask is not None:
-         integrator.mask = override_mask
-     return integrator.integrateImageStack(scan).to_dataset(name='reduced').unstack('system')
+def load_and_reduce(
+    scanid, override_bcx=None, override_bcy=None, override_dist=None, override_mask=None
+):
+    scan = load.loadRun(scanid)
+    scan_us = scan.unstack("system")  # this is expensive, do it only once
+    if "energy" in scan_us.dims:
+        integrator = PyHyperScattering.integrate.PFEnergySeriesIntegrator
+    else:
+        integrator = PyHyperScattering.integrate.PFGeneralIntegrator
+    integrator = integrator(
+        integration_method="csr", geomethod="template_xr", template_xr=scan
+    )
+    if override_bcx is not None:
+        integrator.ni_beamcenter_x = override_bcx
+    if override_bcy is not None:
+        integrator.ni_beamcenter_y = override_bcy
+    if override_dist is not None:
+        integrator.ni_distance = override_dist
+    if override_mask is not None:
+        integrator.mask = override_mask
+    return (
+        integrator.integrateImageStack(scan)
+        .to_dataset(name="reduced")
+        .unstack("system")
+    )
 
 
+load = PyHyperScattering.load.SST1RSoXSDB(corr_mode="none")
+writable_tiled = from_profile("rsoxs")["reduced_sandbox"]
 
-
-load = PyHyperScattering.load.SST1RSoXSDB(corr_mode='none')
-writable_tiled = from_profile('rsoxs')['reduced_sandbox']
 
 @task
 def load_reduce_and_write_to_tiled(scanid):
@@ -45,10 +51,11 @@ def load_reduce_and_write_to_tiled(scanid):
         scan = load_and_reduce(scanid)
     except Exception as e:
         logger.warning(f"Exception during reduction {e}")
-    write_xarray_dataset(writable_tiled,scan)
+    write_xarray_dataset(writable_tiled, scan)
     return scan
-        
-'''
+
+
+"""
 def auto_reduce_recent_data_if_not_reduced(number):
 	for scan_ref in range (-number,-1):
 		try:
@@ -60,7 +67,8 @@ def auto_reduce_recent_data_if_not_reduced(number):
 		except Exception as e:
 			print(f'error in processing {scan_ref}, {e}')
 
-'''
+"""
+
 
 def lookup_directory(start_doc):
     """
@@ -98,6 +106,7 @@ def lookup_directory(start_doc):
     # There should be only one path remaining after these filters.
     # Convert it to a pathlib.Path.
     return Path(paths[0])
+
 
 @flow
 def pyhyper_flow(scan_id=36106):
