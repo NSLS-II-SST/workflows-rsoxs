@@ -10,9 +10,7 @@ from prefect import get_run_logger, task
 PATH = "/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/"
 
 DATA_SESSION_PATTERN = re.compile("[passGUCP]*-([0-9]+)")
-import PyHyperScattering
-import xarray as xr
-from tiled.client import from_uri
+from tiled.client import from_profile
 from tiled.client.xarray import write_xarray_dataset
 
 @task
