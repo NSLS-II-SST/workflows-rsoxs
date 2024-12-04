@@ -3,10 +3,9 @@ from pathlib import Path
 
 import httpx
 import PyHyperScattering
-from prefect import get_run_logger, task, flow
+from prefect import flow, get_run_logger, task
 from tiled.client import from_profile
 from tiled.client.xarray import write_xarray_dataset
-
 
 PATH = "/nsls2/data/dssi/scratch/prefect-outputs/rsoxs/"
 
