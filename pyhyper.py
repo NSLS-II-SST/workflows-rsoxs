@@ -16,7 +16,7 @@ DATA_SESSION_PATTERN = re.compile("[passGUCP]*-([0-9]+)")
 def load_and_reduce(
     scanid, override_bcx=None, override_bcy=None, override_dist=None, override_mask=None
 ):
-    scan = load.loadRun(scanid)
+    scan = load.loadRun(load.c[scanid])
     scan_us = scan.unstack("system")  # this is expensive, do it only once
     if "energy" in scan_us.dims:
         integrator = PyHyperScattering.integrate.PFEnergySeriesIntegrator
