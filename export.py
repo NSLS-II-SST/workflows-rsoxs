@@ -148,6 +148,7 @@ def write_dark_subtraction(ref):
                 "raw_uid": full_uid,
                 "operation": "dark subtraction",
             },
+            access_tags=["rsoxs_sandbox"],
         )
         results[field] = processed_array_client.item["id"]
 
